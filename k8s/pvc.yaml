@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: # use to reference PVC in pods
+  name: db-pvc
+  namespace: testspace
+spec:
+  accessModes:
+    - ReadWriteOnce #Volume can be mounted read/write by one node.
+  resources:
+    requests:
+      storage: 1Gi

@@ -1,0 +1,66 @@
+{{- if .Values.deployments }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.deployments.name }}
+  namespace: {{ .Values.namespaces.name }}
+spec:
+  replicas: {{ .Values.deployments.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.deployments.app }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.deployments.app }}
+    spec:
+      containers:
+        - name: {{ .Values.deployments.container.name }}
+          image: {{ .Values.deployments.container.image }}
+          imagePullPolicy: {{ .Values.deployments.container.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.deployments.container.port }}
+# Add environment variables if defined
+{{- if .Values.deployments.env }}
+          env:
+{{- range .Values.deployments.env }} # Iterate over each env variable
+            - name: {{ .name }}
+{{- if .value }}
+              value: "{{ .value }}"
+{{- else if .valueFrom }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .valueFrom.secretName }}
+                  key: {{ .valueFrom.secretKey }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+
+{{- if .Values.deployments.resources }}
+          resources:
+            requests:
+              cpu: {{ .Values.deployments.resources.requests.cpu }}
+              memory: {{ .Values.deployments.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.deployments.resources.limits.cpu }}
+              memory: {{ .Values.deployments.resources.limits.memory }}
+{{- end }}
+
+{{- if .Values.deployments.volumeMounts }}
+          volumeMounts:
+{{- range .Values.deployments.volumeMounts }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+{{- end }} # Loop end
+{{- end }} # If end
+
+{{- if .Values.deployments.volumes }}
+      volumes:
+{{- range .Values.deployments.volumes }}
+        - name: {{ .name }}
+          persistentVolumeClaim:
+            claimName: {{ .claimName }}
+{{- end }}
+{{- end }}
+{{- end }}

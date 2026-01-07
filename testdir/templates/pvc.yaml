@@ -1,0 +1,13 @@
+{{- if .Values.pvcs }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: # use to reference PVC in pods
+  name: {{ .Values.pvcs.name }}
+  namespace: {{ .Values.namespaces.name }}
+spec:
+  accessModes:
+    - {{ .Values.pvcs.accessModes }}
+  resources:
+    requests:
+      storage: {{ .Values.pvcs.reqstorage }}
+{{- end }}

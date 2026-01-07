@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-deployment
+  namespace: testspace
+spec:
+  replicas: 2
+  selector: # Tells about which pods are managed by this deplyment
+    matchLabels:
+      app: testkube # only the pods with the label app: testkube are managed by this deployment
+  template: # Pod template 
+    metadata:
+      labels:
+        app: testkube # Here every pod gets its label as app: testkube
+    spec: # From this point onwards it defines how the pod should run
+      containers:
+      - name: testkube
+        image: testkube_app:latest  
+        imagePullPolicy: Never
+        ports:
+          - containerPort: 8000
+        env:
+          - name: DATABASE_URL
+            value: "postgresql://dhawala:123@database-service:5432/Testbase"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"

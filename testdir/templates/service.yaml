@@ -1,0 +1,20 @@
+{{- if .Values.services }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.services.name }}
+  namespace: {{ .Values.namespaces.name }}
+spec:
+  type: {{ .Values.services.type }}
+  selector:
+    app: {{ .Values.services.selector.app }}
+  ports:
+    - port: {{ .Values.services.port }}
+      targetPort: {{ .Values.services.targetPort }}
+{{- if eq .Values.services.type "NodePort" }}
+      nodePort: {{ .Values.services.nodePort }}
+{{- end }}
+{{- if .Values.services.protocol }}
+      protocol: {{ .Values.services.protocol }}
+{{- end }}
+{{- end }}

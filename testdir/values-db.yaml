@@ -1,0 +1,66 @@
+deployments:
+  name: postgres-deployment
+  replicas: 1
+  app: postgres
+
+  container:
+    name: postgres
+    image: postgres:13-alpine
+    imagePullPolicy: IfNotPresent
+    port: 5432
+
+  env:
+    - name: POSTGRES_USER
+      valueFrom:
+        secretName: db-secret
+        secretKey: POSTGRES_USER
+
+    - name: POSTGRES_PASSWORD
+      valueFrom:
+        secretName: db-secret
+        secretKey: POSTGRES_PASSWORD
+
+    - name: POSTGRES_DB
+      valueFrom:
+        secretName: db-secret
+        secretKey: POSTGRES_DB
+
+  volumeMounts:
+    - name: db-storage
+      mountPath: /var/lib/postgresql/data
+
+  volumes:
+    - name: db-storage
+      claimName: db-pvc
+
+services:
+  name: database-service
+  type: ClusterIP
+  port: 5432
+  protocol: TCP
+  targetPort: 5432
+  selector:
+    app: postgres
+
+secrets:
+  name: db-secret
+  type: Opaque
+  data:
+    POSTGRES_USER: dhawala #in base 64 "dhawala" 
+    POSTGRES_PASSWORD: 123 
+    POSTGRES_DB: Testbase #in base 64 "Testbase"
+
+namespaces:
+  name: testspace
+  create: true
+#Done
+pvcs:
+  name: db-pvc
+  accessModes: ReadWriteOnce
+  reqstorage: 1Gi
+
+hpa:
+  name: db-hpa
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80  

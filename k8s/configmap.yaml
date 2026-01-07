@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config # Name of the ConfigMap we can use to reference in pods
+  namespace: testspace
+data:
+  # Example config variables
+  APP_NAME: "testkube"
+  APP_ENV: "production"
