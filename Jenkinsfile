@@ -42,25 +42,25 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
-            steps {
-                echo "Running application tests..."
-                sh '''
-                # Create virtual environment and run tests
-                if [ ! -d "env" ]; then
-                    python3 -m venv env
-                fi
-                source env/bin/activate
-                pip install -r requirements.txt
+        // stage('Run Tests') {
+        //     steps {
+        //         echo "Running application tests..."
+        //         sh '''
+        //         # Create virtual environment and run tests
+        //         if [ ! -d "env" ]; then
+        //             python3 -m venv env
+        //         fi
+        //         source env/bin/activate
+        //         pip install -r requirements.txt
                 
-                # Add your test commands here
-                # python -m pytest tests/
-                # python -m unittest discover
+        //         # Add your test commands here
+        //         # python -m pytest tests/
+        //         # python -m unittest discover
                 
-                echo "Tests completed successfully"
-                '''
-            }
-        }
+        //         echo "Tests completed successfully"
+        //         '''
+        //     }
+        // }
 
         stage('Build Docker Image') {
             steps {
