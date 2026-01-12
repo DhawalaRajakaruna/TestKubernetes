@@ -1,39 +1,59 @@
-deployments:
-  name: app-deployment
-  replicas: 2
-  app: testkube
+# Values file for app-only deployment
+# Use: helm install app-release ./testdir/ -f ./testdir/values-app.yaml -n testspace
 
-  container:
-    name: testkube
-    image: testkube_app:latest
-    imagePullPolicy: Never
-    port: 8000
-  env:
-    - name: DATABASE_URL
-      value: postgresql://dhawala:123@database-service:5432/Testbase
-  resources:
-    requests:
-      cpu: "100m"
-      memory: "128Mi"
-    limits:
-      cpu: "500m"
-      memory: "256Mi"
+# Global settings
+global:
+  namespace: testspace
 
-services:
-  name: app-service
-  type: NodePort
-  port: 80
-  targetPort: 8000
-  nodePort: 30000
-  selector:
-    app: testkube
-
+# Namespace configuration
 namespaces:
   name: testspace
-  create: false
+  create: false  # Database deployment creates the namespace
 
-hpa:
-  name: app-hpa
-  minReplicas: 2
-  maxReplicas: 5
-  targetCPUUtilizationPercentage: 80  
+# Enable only app components
+enabled:
+  app: true
+  database: false
+  secrets: false
+  pvc: false
+  hpa: true
+
+# Application deployment configuration
+app:
+  deployment:
+    name: app-deployment
+    replicas: 2
+    app: testkube
+    
+    container:
+      name: testkube
+      image: testkube_app:latest
+      imagePullPolicy: Never
+      port: 8000
+    
+    env:
+      - name: DATABASE_URL
+        value: postgresql://dhawala:123@database-service:5432/Testbase
+    
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "256Mi"
+  
+  service:
+    name: app-service
+    type: NodePort
+    port: 80
+    targetPort: 8000
+    nodePort: 30000
+    selector:
+      app: testkube
+  
+  hpa:
+    name: app-hpa
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80

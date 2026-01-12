@@ -1,13 +1,13 @@
-{{- if .Values.pvcs }}
+{{- if and .Values.enabled.pvc .Values.database }}
 apiVersion: v1
 kind: PersistentVolumeClaim
-metadata: # use to reference PVC in pods
-  name: {{ .Values.pvcs.name }}
+metadata:
+  name: {{ .Values.database.pvc.name }}
   namespace: {{ .Values.namespaces.name }}
 spec:
   accessModes:
-    - {{ .Values.pvcs.accessModes }}
+    - {{ .Values.database.pvc.accessModes }}
   resources:
     requests:
-      storage: {{ .Values.pvcs.reqstorage }}
+      storage: {{ .Values.database.pvc.reqstorage }}
 {{- end }}

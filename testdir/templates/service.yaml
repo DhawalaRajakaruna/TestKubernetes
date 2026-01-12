@@ -1,20 +1,35 @@
-{{- if .Values.services }}
+{{- if and .Values.enabled.app .Values.app }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.services.name }}
+  name: {{ .Values.app.service.name }}
   namespace: {{ .Values.namespaces.name }}
 spec:
-  type: {{ .Values.services.type }}
+  type: {{ .Values.app.service.type }}
   selector:
-    app: {{ .Values.services.selector.app }}
+    app: {{ .Values.app.service.selector.app }}
   ports:
-    - port: {{ .Values.services.port }}
-      targetPort: {{ .Values.services.targetPort }}
-{{- if eq .Values.services.type "NodePort" }}
-      nodePort: {{ .Values.services.nodePort }}
+    - port: {{ .Values.app.service.port }}
+      targetPort: {{ .Values.app.service.targetPort }}
+{{- if eq .Values.app.service.type "NodePort" }}
+      nodePort: {{ .Values.app.service.nodePort }}
 {{- end }}
-{{- if .Values.services.protocol }}
-      protocol: {{ .Values.services.protocol }}
+{{- end }}
+---
+{{- if and .Values.enabled.database .Values.database }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.database.service.name }}
+  namespace: {{ .Values.namespaces.name }}
+spec:
+  type: {{ .Values.database.service.type }}
+  selector:
+    app: {{ .Values.database.service.selector.app }}
+  ports:
+    - port: {{ .Values.database.service.port }}
+      targetPort: {{ .Values.database.service.targetPort }}
+{{- if .Values.database.service.protocol }}
+      protocol: {{ .Values.database.service.protocol }}
 {{- end }}
 {{- end }}
