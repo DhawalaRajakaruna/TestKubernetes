@@ -13,8 +13,9 @@ pipeline {
         APP_RELEASE = "app-release"
         HELM_CHART_PATH = "./testdir"
         
-        // Minikube docker environment
-        USE_MINIKUBE_DOCKER = "true"
+        // Deployment mode: 'minikube' or 'registry'
+        // Set to 'registry' when Jenkins runs in Docker container
+        DEPLOYMENT_MODE = "registry"
     }
 
     stages {
@@ -32,74 +33,113 @@ pipeline {
             steps {
                 script {
                     echo "Setting up environment..."
-                    if (env.USE_MINIKUBE_DOCKER == 'true') {
-                        sh '''
-                        echo "Configuring Docker to use Minikube's Docker daemon..."
-                        eval $(minikube docker-env)
-                        '''
-                    }
+                    echo "Deployment Mode: ${env.DEPLOYMENT_MODE}"
+                    
+                    // Check available tools
+                    sh '''
+                    echo "Checking available tools..."
+                    docker --version || echo "⚠️  Docker not available"
+                    kubectl version --client || echo "⚠️  kubectl not available"
+                    helm version || echo "⚠️  Helm not available"
+                    minikube version || echo "⚠️  Minikube not available"
+                    '''
                 }
             }
         }
 
-        // stage('Run Tests') {
-        //     steps {
-        //         echo "Running application tests..."
-        //         sh '''
-        //         # Create virtual environment and run tests
-        //         if [ ! -d "env" ]; then
-        //             python3 -m venv env
-        //         fi
-        //         source env/bin/activate
-        //         pip install -r requirements.txt
+        stage('Run Tests') {
+            steps {
+                echo "Running application tests..."
+                sh '''
+                # Check Python version
+                python3 --version || { echo "Python 3 not found"; exit 1; }
                 
-        //         # Add your test commands here
-        //         # python -m pytest tests/
-        //         # python -m unittest discover
+                # Use Jenkins workspace-specific venv to avoid conflicts
+                VENV_DIR="jenkins_venv_${BUILD_NUMBER}"
                 
-        //         echo "Tests completed successfully"
-        //         '''
-        //     }
-        // }
-
+                # Clean up old venvs (keep last 3)
+                ls -dt jenkins_venv_* 2>/dev/null | tail -n +4 | xargs rm -rf || true
+                
+                # Create fresh virtual environment
+                echo "Creating virtual environment..."
+                python3 -m venv ${VENV_DIR}
+                
+                # Activate and install dependencies
+                . ${VENV_DIR}/bin/activate
+                
+                echo "Installing dependencies..."
+                pip install --upgrade pip
+                pip install -r requirements.txt
+                
+                # Run syntax check
+                echo "Running Python syntax check..."
+                python3 -m py_compile main.py database.py
+                
+                # Run import check
+                echo "Checking imports..."
+                python3 -c "import main; import database; print('All imports successful')"
+                
+                # Add your test commands here when tests are available
+                # python -m pytest tests/ -v
+                # python -m unittest discover -s tests -v
+                
+                echo "✅ Tests completed successfully"
+                
+                # Cleanup venv
+                deactivate
+                rm -rf ${VENV_DIR}
         stage('Build Docker Image') {
             steps {
                 echo "Building Docker image..."
                 script {
-                    if (env.USE_MINIKUBE_DOCKER == 'true') {
+                    if (env.DEPLOYMENT_MODE == 'minikube') {
                         sh '''
+                        echo "Building for Minikube..."
                         eval $(minikube docker-env)
                         docker build -t ${APP_IMAGE_NAME}:${IMAGE_TAG} .
                         docker tag ${APP_IMAGE_NAME}:${IMAGE_TAG} ${APP_IMAGE_NAME}:latest
-                        echo "Image built in Minikube Docker daemon"
+                        echo "✅ Image built in Minikube Docker daemon"
                         '''
                     } else {
                         sh '''
+                        echo "Building for Docker registry..."
                         docker build -t ${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:${IMAGE_TAG} .
                         docker tag ${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:latest
+                        echo "✅ Image built and tagged"
                         '''
                     }
                 }
             }
-        }
-
+        }               '''
+                    }
+                }
         stage('Push Docker Image') {
             when {
-                expression { env.USE_MINIKUBE_DOCKER != 'true' }
+                expression { env.DEPLOYMENT_MODE == 'registry' }
             }
             steps {
-                echo "Pushing Docker image to registry..."
+                echo "Pushing Docker image to DockerHub..."
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
+                    echo "Logging into DockerHub..."
                     echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                    
+                    echo "Pushing ${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:${IMAGE_TAG}..."
                     docker push ${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:${IMAGE_TAG}
+                    
+                    echo "Pushing ${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:latest..."
                     docker push ${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:latest
+                    
                     docker logout
+                    echo "✅ Images pushed successfully"
                     '''
+                }
+            }
+        }           '''
                 }
             }
         }
@@ -125,50 +165,70 @@ pipeline {
                 # Wait for database to be ready
                 echo "Waiting for database pod to be ready..."
                 kubectl wait --for=condition=ready pod \
-                    -l app=postgres \
-                    -n ${NAMESPACE} \
-                    --timeout=300s
-                '''
-            }
-        }
-
         stage('Deploy Application') {
             steps {
                 echo "Deploying application using Helm..."
                 script {
-                    if (env.USE_MINIKUBE_DOCKER == 'true') {
+                    if (env.DEPLOYMENT_MODE == 'minikube') {
                         sh '''
-                        # Update values-app.yaml with new image tag
-                        sed -i "s|image: testkube_app:.*|image: ${APP_IMAGE_NAME}:${IMAGE_TAG}|g" ${HELM_CHART_PATH}/values-app.yaml
+                        echo "Deploying with Minikube local image..."
                         
-                        # Deploy or upgrade application
+                        # Deploy or upgrade application with local image
                         if helm list -n ${NAMESPACE} | grep -q ${APP_RELEASE}; then
                             echo "Upgrading existing application release..."
                             helm upgrade ${APP_RELEASE} ${HELM_CHART_PATH} \
                                 -f ${HELM_CHART_PATH}/values-app.yaml \
-                                -n ${NAMESPACE}
+                                -n ${NAMESPACE} \
+                                --set app.deployment.container.image=${APP_IMAGE_NAME}:${IMAGE_TAG} \
+                                --set app.deployment.container.imagePullPolicy=Never
                         else
                             echo "Installing new application release..."
                             helm install ${APP_RELEASE} ${HELM_CHART_PATH} \
                                 -f ${HELM_CHART_PATH}/values-app.yaml \
-                                -n ${NAMESPACE}
+                                -n ${NAMESPACE} \
+                                --set app.deployment.container.image=${APP_IMAGE_NAME}:${IMAGE_TAG} \
+                                --set app.deployment.container.imagePullPolicy=Never
                         fi
                         '''
                     } else {
                         sh '''
-                        # Deploy with registry image
-                        helm upgrade --install ${APP_RELEASE} ${HELM_CHART_PATH} \
-                            -f ${HELM_CHART_PATH}/values-app.yaml \
-                            -n ${NAMESPACE} \
+                        echo "Deploying with DockerHub registry image..."
+                        
+                        # Deploy or upgrade with registry image
+                        if helm list -n ${NAMESPACE} | grep -q ${APP_RELEASE}; then
+                            echo "Upgrading existing application release..."
+                            helm upgrade ${APP_RELEASE} ${HELM_CHART_PATH} \
+                                -f ${HELM_CHART_PATH}/values-app.yaml \
+                                -n ${NAMESPACE} \
+                                --set app.deployment.container.image=${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:${IMAGE_TAG} \
+                                --set app.deployment.container.imagePullPolicy=Always
+                        else
+                            echo "Installing new application release..."
+                            helm install ${APP_RELEASE} ${HELM_CHART_PATH} \
+                                -f ${HELM_CHART_PATH}/values-app.yaml \
+                                -n ${NAMESPACE} \
+                                --set app.deployment.container.image=${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:${IMAGE_TAG} \
+                                --set app.deployment.container.imagePullPolicy=Always
+                        fi
+                        echo "✅ Application deployed"
+                        '''
+                    }
+                }
+            }
+        }                   -n ${NAMESPACE} \
                             --set app.deployment.container.image=${DOCKER_REGISTRY}/${APP_IMAGE_NAME}:${IMAGE_TAG} \
                             --set app.deployment.container.imagePullPolicy=Always
                         '''
                     }
                 }
             }
-        }
-
-        stage('Verify Deployment') {
+                # Get application URL (if minikube available)
+                echo "Application URL:"
+                if command -v minikube &> /dev/null; then
+                    minikube service app-service -n ${NAMESPACE} --url || echo "Service not accessible via minikube"
+                else
+                    kubectl get svc app-service -n ${NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' || echo "Get service IP with: kubectl get svc -n ${NAMESPACE}"
+                fi
             steps {
                 echo "Verifying deployment..."
                 sh '''
@@ -176,33 +236,47 @@ pipeline {
                 echo "Waiting for application pods to be ready..."
                 kubectl wait --for=condition=ready pod \
                     -l app=testkube \
-                    -n ${NAMESPACE} \
-                    --timeout=300s
-                
-                # Get deployment status
-                echo "Application Deployment Status:"
-                kubectl get deployments -n ${NAMESPACE}
-                
-                echo "Application Pods:"
-                kubectl get pods -n ${NAMESPACE}
-                
-                echo "Application Services:"
-                kubectl get services -n ${NAMESPACE}
-                
-                # Get application URL
-                echo "Application URL:"
-                minikube service app-service -n ${NAMESPACE} --url || echo "Service not accessible"
-                '''
-            }
-        }
-
         stage('Run Health Check') {
             steps {
                 echo "Running health checks..."
                 sh '''
-                # Get service URL
-                SERVICE_URL=$(minikube service app-service -n ${NAMESPACE} --url | head -n 1)
+                # Wait for app to be fully ready
+                sleep 15
                 
+                # Try to get service URL
+                if command -v minikube &> /dev/null; then
+                    SERVICE_URL=$(minikube service app-service -n ${NAMESPACE} --url 2>/dev/null | head -n 1)
+                else
+                    # For non-minikube setups, use port-forward temporarily
+                    echo "Minikube not available, attempting port-forward for health check..."
+                    kubectl port-forward -n ${NAMESPACE} svc/app-service 8080:80 &
+                    PF_PID=$!
+                    sleep 3
+                    SERVICE_URL="http://localhost:8080"
+                fi
+                
+                if [ -n "$SERVICE_URL" ]; then
+                    echo "Testing application at: $SERVICE_URL"
+                    
+                    # Test health endpoint
+                    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${SERVICE_URL}/ 2>/dev/null || echo "000")
+                    
+                    if [ "$HTTP_STATUS" = "200" ]; then
+                        echo "✅ Health check passed - HTTP ${HTTP_STATUS}"
+                    else
+                        echo "⚠️  Health check returned HTTP ${HTTP_STATUS}"
+                    fi
+                    
+                    # Kill port-forward if we started it
+                    if [ -n "$PF_PID" ]; then
+                        kill $PF_PID 2>/dev/null || true
+                    fi
+                else
+                    echo "⚠️  Could not get service URL for health check"
+                fi
+                '''
+            }
+        }       
                 if [ -n "$SERVICE_URL" ]; then
                     echo "Testing application at: $SERVICE_URL"
                     
@@ -216,9 +290,14 @@ pipeline {
                         echo " Health check passed - HTTP ${HTTP_STATUS}"
                     else
                         echo "  Health check returned HTTP ${HTTP_STATUS}"
-                    fi
-                else
-                    echo "  Could not get service URL"
+            echo ""
+            echo "Access the application:"
+            if command -v minikube &> /dev/null; then
+                minikube service app-service -n ${NAMESPACE} --url || true
+            else
+                echo "Run: kubectl port-forward -n ${NAMESPACE} svc/app-service 8080:80"
+                echo "Then access: http://localhost:8080"
+            fi
                 fi
                 '''
             }
@@ -234,16 +313,16 @@ pipeline {
             echo "Deployed Resources:"
             kubectl get all -n ${NAMESPACE}
             
-            echo ""
-            echo "Access the application:"
-            minikube service app-service -n ${NAMESPACE} --url || true
-            '''
-        }
-        failure {
-            echo "======================================"
-            echo " DEPLOYMENT FAILED"
-            echo "======================================"
+        always {
+            echo "Cleaning up..."
             sh '''
+            # Clean up old docker images (keep last 5)
+            if [ "${DEPLOYMENT_MODE}" = "minikube" ] && command -v minikube &> /dev/null; then
+                eval $(minikube docker-env) || true
+                docker images 2>/dev/null | grep ${APP_IMAGE_NAME} | tail -n +6 | awk '{print $3}' | xargs -r docker rmi 2>/dev/null || true
+            fi
+            '''
+        }   sh '''
             echo "Checking pod status:"
             kubectl get pods -n ${NAMESPACE} || true
             
