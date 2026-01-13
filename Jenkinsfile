@@ -43,40 +43,40 @@ pipeline {
             }
         }
 
-        // stage('Deploy Database (Helm)') {
-        //     steps {
-        //         sh '''
-        //             set -e
-        //             echo "Installing/Upgrading database release ${DB_RELEASE} in namespace ${NAMESPACE}..."
-        //             helm upgrade --install ${DB_RELEASE} ${HELM_CHART_PATH} \
-        //                 -f ${HELM_CHART_PATH}/values-db.yaml \
-        //                 -n ${NAMESPACE} \
-        //                 --create-namespace
+        stage('Deploy Database (Helm)') {
+            steps {
+                sh '''
+                    set -e
+                    echo "Installing/Upgrading database release ${DB_RELEASE} in namespace ${NAMESPACE}..."
+                    helm upgrade --install ${DB_RELEASE} ${HELM_CHART_PATH} \
+                        -f ${HELM_CHART_PATH}/values-db.yaml \
+                        -n ${NAMESPACE} \
+                        --create-namespace
 
-        //             echo "Waiting for PostgreSQL pod to be ready..."
-        //             kubectl wait --for=condition=ready pod -l app=postgres -n ${NAMESPACE} --timeout=300s
-        //         '''
-        //     }
-        // }
+                    echo "Waiting for PostgreSQL pod to be ready..."
+                    kubectl wait --for=condition=ready pod -l app=postgres -n ${NAMESPACE} --timeout=300s
+                '''
+            }
+        }
 
-        // stage('Deploy Application (Helm)') {
-        //     steps {
-        //         withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
-        //             sh '''
-        //                 set -e
-        //                 echo "Installing/Upgrading application release ${APP_RELEASE} in namespace ${NAMESPACE}..."
-        //                 helm upgrade --install ${APP_RELEASE} ${HELM_CHART_PATH} \
-        //                     -f ${HELM_CHART_PATH}/values-app.yaml \
-        //                     -n ${NAMESPACE} \
-        //                     --set app.deployment.container.image=${DOCKERHUB_USER}/${APP_IMAGE_NAME}:${IMAGE_TAG} \
-        //                     --set app.deployment.container.imagePullPolicy=Always
+        stage('Deploy Application (Helm)') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                    sh '''
+                        set -e
+                        echo "Installing/Upgrading application release ${APP_RELEASE} in namespace ${NAMESPACE}..."
+                        helm upgrade --install ${APP_RELEASE} ${HELM_CHART_PATH} \
+                            -f ${HELM_CHART_PATH}/values-app.yaml \
+                            -n ${NAMESPACE} \
+                            --set app.deployment.container.image=${DOCKERHUB_USER}/${APP_IMAGE_NAME}:${IMAGE_TAG} \
+                            --set app.deployment.container.imagePullPolicy=Always
 
-        //                 echo "Waiting for application pods to be ready..."
-        //                 kubectl wait --for=condition=ready pod -l app=testkube -n ${NAMESPACE} --timeout=300s
-        //             '''
-        //         }
-        //     }
-        // }
+                        echo "Waiting for application pods to be ready..."
+                        kubectl wait --for=condition=ready pod -l app=testkube -n ${NAMESPACE} --timeout=300s
+                    '''
+                }
+            }
+        }
 
         // stage('Verify & Health Check') {
         //     steps {
