@@ -23,7 +23,11 @@ if env_database_url:
     db_host = parsed.host
     db_port = parsed.port or 5432
     db_name = parsed.database
-    DATABASE_URL = env_database_url
+    # Ensure we use asyncpg driver
+    if env_database_url.startswith('postgresql://'):
+        DATABASE_URL = env_database_url.replace('postgresql://', 'postgresql+asyncpg://', 1)
+    else:
+        DATABASE_URL = env_database_url
 else:
     if not config.has_section('postgresql'):
         raise RuntimeError(
