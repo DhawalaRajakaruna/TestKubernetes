@@ -78,30 +78,30 @@ pipeline {
             }
         }
 
-        // stage('Verify & Health Check') {
-        //     steps {
-        //         sh '''
-        //             set -e
-        //             echo "Resources in namespace ${NAMESPACE}:"
-        //             kubectl get all -n ${NAMESPACE}
+        stage('Verify & Health Check') {
+            steps {
+                sh '''
+                    set -e
+                    echo "Resources in namespace ${NAMESPACE}:"
+                    kubectl get all -n ${NAMESPACE}
 
-        //             echo "Attempting port-forward for health check..."
-        //             kubectl port-forward -n ${NAMESPACE} svc/app-service 8080:80 >/dev/null 2>&1 &
-        //             PF_PID=$!
-        //             sleep 3
+                    echo "Attempting port-forward for health check..."
+                    kubectl port-forward -n ${NAMESPACE} svc/app-service 8080:80 >/dev/null 2>&1 &
+                    PF_PID=$!
+                    sleep 3
 
-        //             STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ || echo "000")
-        //             echo "Health check HTTP status: ${STATUS}"
+                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ || echo "000")
+                    echo "Health check HTTP status: ${STATUS}"
 
-        //             kill $PF_PID 2>/dev/null || true
+                    kill $PF_PID 2>/dev/null || true
 
-        //             if [ "${STATUS}" != "200" ]; then
-        //               echo "Warning: health check did not return 200. Check pod logs below:"
-        //               kubectl logs -n ${NAMESPACE} -l app=testkube --tail=100 || true
-        //             fi
-        //         '''
-        //     }
-        // }
+                    if [ "${STATUS}" != "200" ]; then
+                      echo "Warning: health check did not return 200. Check pod logs below:"
+                      kubectl logs -n ${NAMESPACE} -l app=testkube --tail=100 || true
+                    fi
+                '''
+            }
+        }
     }
 
     post {
