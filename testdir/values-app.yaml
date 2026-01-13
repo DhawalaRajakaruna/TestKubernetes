@@ -28,7 +28,7 @@ app:
     container:
       name: testkube
       image: testkube_app:latest
-      imagePullPolicy: Never
+      imagePullPolicy: Always
       port: 8000
     
     env:

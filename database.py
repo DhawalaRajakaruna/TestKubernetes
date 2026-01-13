@@ -5,19 +5,37 @@ from pathlib import Path
 import asyncio
 from sqlalchemy import text
 import asyncpg
+import os
+from sqlalchemy.engine.url import make_url
 
 config = configparser.ConfigParser()
 config_path = Path(__file__).resolve().parent / 'database.ini'
 config.read(config_path)
 
-db_user = config['postgresql']['user']
-db_password = config['postgresql']['password'] 
-db_host = config['postgresql']['host']
-db_port = config['postgresql']['port']
-db_name = "Testbase"
+# Prefer DATABASE_URL from environment (Kubernetes/Helm), fallback to database.ini
+env_database_url = os.getenv("DATABASE_URL")
 
-# URL for connecting to the main database
-DATABASE_URL = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+if env_database_url:
+    # Parse the URL to extract connection params for admin operations
+    parsed = make_url(env_database_url)
+    db_user = parsed.username
+    db_password = parsed.password
+    db_host = parsed.host
+    db_port = parsed.port or 5432
+    db_name = parsed.database
+    DATABASE_URL = env_database_url
+else:
+    if not config.has_section('postgresql'):
+        raise RuntimeError(
+            "Missing 'postgresql' section in database.ini and no DATABASE_URL environment variable provided"
+        )
+    db_user = config['postgresql'].get('user')
+    db_password = config['postgresql'].get('password')
+    db_host = config['postgresql'].get('host', 'localhost')
+    db_port = config['postgresql'].get('port', '5432')
+    db_name = config['postgresql'].get('database', 'Testbase')
+    # URL for connecting to the main database
+    DATABASE_URL = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
 print(DATABASE_URL)
 print("==============================================")
