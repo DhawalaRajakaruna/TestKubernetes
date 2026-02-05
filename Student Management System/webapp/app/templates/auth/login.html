@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 12px 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container-sm">
+        <a href="/" class="back-link">← Back to Home</a>
+        
+        <div class="card">
+            <div class="card-header">
+                <div class="brand">
+                    <div class="brand-icon">🔐</div>
+                </div>
+                <h1>Admin Login</h1>
+                <p>Enter your credentials to access the dashboard</p>
+            </div>
+            
+            <div id="errorMessage" class="error-message"></div>
+            
+            <form id="loginForm" action="/submit-login" method="post">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" class="form-control" placeholder="Enter your username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" class="form-control" placeholder="Enter your password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn">
+                    Login
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const form = e.target;
+            const formData = new FormData(form);
+            const errorDiv = document.getElementById('errorMessage');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            // Hide any previous error
+            errorDiv.classList.remove('show');
+            
+            // Show loading state
+            submitBtn.textContent = 'Logging in...';
+            submitBtn.classList.add('loading');
+            
+            try {
+                const response = await fetch('/submit-login', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type');
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        if (data.error) {
+                            errorDiv.textContent = data.error;
+                            errorDiv.classList.add('show');
+                        }
+                    } else {
+                        // Success - redirect to dashboard
+                        window.location.href = '/dashboard';
+                    }
+                } else {
+                    const data = await response.json();
+                    errorDiv.textContent = data.error || 'Invalid username or password!';
+                    errorDiv.classList.add('show');
+                }
+            } catch (error) {
+                errorDiv.textContent = 'An error occurred. Please try again.';
+                errorDiv.classList.add('show');
+            } finally {
+                // Reset button state
+                submitBtn.textContent = 'Login';
+                submitBtn.classList.remove('loading');
+            }
+        });
+    </script>
+
+</body>
+</html>

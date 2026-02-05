@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Student</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <script>
+        function validateForm() {
+            const checkboxes = document.querySelectorAll('input[name="subjects"]:checked');
+            if (checkboxes.length === 0) {
+                alert('Please select at least one subject to enroll!');
+                return false;
+            }
+            return true;
+        }
+
+
+    </script>
+</head>
+<body>
+    
+    <div class="container-md">
+        <a href="{{ url_for('dashboard') }}" class="back-link">← Back to Dashboard</a>
+        
+        <div class="card">
+            <div class="card-header">
+                <div class="brand">
+                    <div class="brand-icon">➕</div>
+                </div>
+                <h1>Register New Student</h1>
+                <p>Fill in the details to add a new student</p>
+            </div>
+            
+            <form action="/submit-newstd" method="post" onsubmit="return validateForm()">
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" name="name" class="form-control" placeholder="Enter student's full name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="age">Age</label>
+                    <input type="number" id="age" name="age" class="form-control" placeholder="Enter student's age" min="0" max="150" required>
+                </div>
+
+
+                <div class="form-group">
+                    <label for="grade">Grade</label>
+                    <input type="text" id="grade" name="grade" class="form-control" placeholder="Enter student's grade" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" class="form-control" placeholder="Enter student's email" required>
+                </div>
+
+                <fieldset class="fieldset">
+                    <legend>Select Subjects to Enroll</legend>
+                    <div class="checkbox-group">
+                        {% if subjects %}
+                            {% for subject in subjects %}
+                                <div class="checkbox-item">
+                                    <input type="checkbox" 
+                                           id="subject_{{ subject.sub_id }}" 
+                                           name="subjects" 
+                                           value="{{ subject.sub_id }}">
+                                    <label for="subject_{{ subject.sub_id }}">
+                                        {{ subject.name }} - {{ subject.description }}
+                                    </label>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">No subjects available.</p>
+                        {% endif %}
+                    </div>
+                </fieldset>
+
+                <button id="regbut" type="submit" class="btn btn-success btn-block btn-lg mt-2">
+                    ✓ Register Student
+                </button>
+            </form>
+        </div>
+    </div>
+<script>
+    // Age validation - show error only on blur, not while typing
+    document.getElementById('age').addEventListener('blur', function () {
+        const age = Number(this.value);
+        if (this.value && (age < 0 || age > 150)) {
+            this.setCustomValidity('Age must be between 0 and 150.');
+            this.reportValidity();
+        } else {
+            this.setCustomValidity('');
+        }
+    });
+
+    // Clear age validation while typing if value becomes valid
+    document.getElementById('age').addEventListener('input', function () {
+        const age = Number(this.value);
+        if (age >= 0 && age <= 150) {
+            this.setCustomValidity('');
+        }
+    });
+
+    // Email validation - debounced to avoid too many requests
+    let emailTimeout;
+    document.getElementById('email').addEventListener('input', async function () {
+        const email = this.value.trim();
+        
+        // Clear previous timeout
+        clearTimeout(emailTimeout);
+        
+        if (!email) {
+            this.setCustomValidity('');
+            return;
+        }
+
+        // Wait 500ms after user stops typing
+        emailTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(
+                    '/get-students-by-mail?email=' + encodeURIComponent(email)
+                );
+                if (response.ok) {
+                    this.setCustomValidity('A student with this email already exists.');
+                } else {
+                    this.setCustomValidity('');
+                }
+                this.reportValidity();
+            } catch (error) {
+                console.error(error);
+                this.setCustomValidity('');
+            }
+        }, 500);
+    });
+
+    // Form submission with comprehensive validation
+    document.getElementById('regbut').addEventListener('click', async (e) => {
+        e.preventDefault();
+        
+        const form = document.querySelector('form');
+        const ageInput = document.getElementById('age');
+        const emailInput = document.getElementById('email');
+        const nameInput = document.getElementById('name');
+        const gradeInput = document.getElementById('grade');
+        
+        // 1. Validate required fields
+        if (!nameInput.value.trim()) {
+            alert('Please enter student name');
+            nameInput.focus();
+            return;
+        }
+        
+        if (!ageInput.value) {
+            alert('Please enter age');
+            ageInput.focus();
+            return;
+        }
+        
+        if (!gradeInput.value) {
+            alert('Please select a grade');
+            gradeInput.focus();
+            return;
+        }
+        
+        if (!emailInput.value.trim()) {
+            alert('Please enter email');
+            emailInput.focus();
+            return;
+        }
+        
+        // 2. Validate age range
+        const age = Number(ageInput.value);
+        if (age < 0 || age > 150 || isNaN(age)) {
+            ageInput.setCustomValidity('Age must be between 0 and 150.');
+            ageInput.reportValidity();
+            ageInput.focus();
+            return;
+        } else {
+            ageInput.setCustomValidity('');
+        }
+
+        // 3. Validate at least one subject is selected
+        const checkboxes = document.querySelectorAll('input[name="subjects"]:checked');
+        if (checkboxes.length === 0) {
+            alert('Please select at least one subject to enroll!');
+            return;
+        }
+
+        // 4. Validate email format (HTML5 validation)
+        if (!emailInput.checkValidity()) {
+            alert('Please enter a valid email address');
+            emailInput.focus();
+            return;
+        }
+
+        // 5. Validate email doesn't already exist in database
+        const email = emailInput.value.trim();
+        try {
+            const checkResponse = await fetch(
+                '/get-students-by-mail?email=' + encodeURIComponent(email)
+            );
+            if (checkResponse.ok) {
+                emailInput.setCustomValidity('A student with this email already exists.');
+                emailInput.reportValidity();
+                emailInput.focus();
+                return;
+            } else {
+                emailInput.setCustomValidity('');
+            }
+        } catch (error) {
+            console.error('Email validation error:', error);
+            alert('Unable to verify email. Please try again.');
+            return;
+        }
+
+        // 6. Check all other HTML5 validations
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        // All validations passed - show loading indicator (optional)
+        const originalButtonText = e.target.textContent;
+        e.target.disabled = true;
+        e.target.textContent = 'Submitting...';
+
+        // 7. Submit the form
+        try {
+            const response = await fetch('/submit-newstd', {
+                method: 'POST',
+                body: new FormData(form)
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                alert(data.message || 'Failed to register student');
+            } else {
+                alert(data.message || 'Student registered successfully!');
+                form.reset();
+                // Optional: Redirect after success
+                // window.location.href = '/students';
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        } finally {
+            // Re-enable button
+            e.target.disabled = false;
+            e.target.textContent = originalButtonText;
+        }
+    });
+
+    // Optional: Real-time subject validation feedback
+    const subjectCheckboxes = document.querySelectorAll('input[name="subjects"]');
+    subjectCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const checked = document.querySelectorAll('input[name="subjects"]:checked');
+            const subjectContainer = document.querySelector('.subjects-container') || this.closest('div');
+            
+            // Remove any existing error message
+            const existingError = document.getElementById('subject-error');
+            if (existingError) {
+                existingError.remove();
+            }
+            
+            // Show visual feedback (optional)
+            if (checked.length === 0) {
+                subjectContainer.style.borderColor = 'red';
+            } else {
+                subjectContainer.style.borderColor = '';
+            }
+        });
+    });
+</script>
+
+
+</body>
+</html>

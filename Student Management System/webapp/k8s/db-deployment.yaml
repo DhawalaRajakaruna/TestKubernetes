@@ -1,0 +1,50 @@
+apiVersion: apps/v1 # specify the service for a deplyment as v1
+kind: Deployment # this is the type of resource we are creating, This is deplyment type
+metadata:
+  name: postgres-deployment  # Given name for the deployment
+spec:
+  replicas: 1 # only one pod should be alwayys there for the database
+  selector:
+    matchLabels:
+      app: postgres_db # Only the pods with the label app:postgres_db will get the traffic from this deployment
+  template: # starting the template for the pod
+    metadata:
+      labels:
+        app: postgres_db # this is the label which we are giving to the pod 
+    spec: # giving specifications for the pod runs database
+      containers:
+      - name: postgres-db # we need to have a container named postgres_db inside the pod
+        image: postgres:15-alpine # the image which should be inside the container if that is not here shpould pull from docker hub
+        imagePullPolicy: IfNotPresent # only pull the image from docker hub if it is not present locally
+        ports:
+        - containerPort: 5432 # port on which the container will listen inside the pod
+        env: # Setting up the environemnet needs to properly have the database running
+          - name: POSTGRES_USER # user name for in the database --------------
+            valueFrom:
+              secretKeyRef:
+                name: db-secret # we have to referance the secret to get the username
+                key: POSTGRES_USER # get the key inside the databse for the username
+          - name: POSTGRES_PASSWORD # password for the database--------------
+            valueFrom:
+              secretKeyRef:
+                name: db-secret # we have to referance the secret to get the password
+                key: POSTGRES_PASSWORD # get the key inside the databse for the password
+          - name: POSTGRES_DB # database name inside the database--------------
+            valueFrom:
+              secretKeyRef:
+                name: db-secret # we have to referance the secret to get the database name
+                key: POSTGRES_DB # get the key inside the databse for the database name
+        resources: # Resource limits and requests for the container --------------
+          limits:
+            memory: "512Mi" # maximum memory the container can use
+            cpu: "500m"    # maximum CPU the container can use
+          requests:
+            memory: "256Mi" # minimum memory the container needs
+            cpu: "250m"     # minimum CPU the container needs
+        volumeMounts: # Mounts a volume to the container tos store data outside. --------(belongs to the container)
+          - name: postgres-storage # links to the volume defined in the pod spec
+            mountPath: /var/lib/postgresql/data # this is the path inside the container where the volume will be mounted
+      volumes: #Defines volumes that the pod can provide to the container. --------(belongs to the pod)
+      - name: postgres-storage # defined a volume available to pod
+        persistentVolumeClaim: # use this to have persistent storage
+          claimName: postgres-pvc # PVC that provides the storage for this volume

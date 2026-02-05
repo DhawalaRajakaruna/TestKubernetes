@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard</title>
+<link rel="stylesheet" href="/static/css/main.css">
+<style>
+    .logout-container {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 20px;
+    }
+
+    .logout-btn {
+        background-color: #dc3545;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s;
+        box-shadow: 0 2px 5px rgba(220, 53, 69, 0.3);
+    }
+
+    .logout-btn:hover {
+        background-color: #c82333;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(220, 53, 69, 0.4);
+    }
+
+    .admin-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #007bff;
+    }
+
+    .admin-welcome {
+        font-size: 16px;
+        color: #333;
+    }
+
+    .admin-welcome strong {
+        color: #007bff;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+<div class="card">
+<div class="card-header">
+<div class="brand">
+<div class="brand-icon">📊</div>
+</div>
+<h1>Admin Dashboard</h1>
+<p>Manage your students and their enrollments</p>
+</div>
+
+<!-- Admin Info and Logout -->
+<div class="admin-info">
+<div class="admin-welcome">
+                👋 Welcome, <strong>{{ username }}</strong>
+</div>
+<a href="/logout" class="logout-btn">
+                🚪 Logout
+</a>
+</div>
+
+<div class="dashboard-grid">
+<a href="/registerstd" class="dashboard-card register">
+<div class="icon">➕</div>
+<h3>Register Student</h3>
+<p>Add new students to the system</p>
+</a>
+<a href="/stdlist" class="dashboard-card view">
+<div class="icon">👥</div>
+<h3>View Students</h3>
+<p>Browse all registered students</p>
+</a>
+<a href="/updatestd" class="dashboard-card update">
+<div class="icon">✏️</div>
+<h3>Update Student</h3>
+<p>Modify student information</p>
+</a>
+
+<a href="/deletestd" class="dashboard-card delete">
+<div class="icon">🗑️</div>
+<h3>Delete Student</h3>
+<p>Remove students from the system</p>
+</a>
+
+</div>
+</div>
+</div>
+</body>
+
+</html>

@@ -1,0 +1,13 @@
+apiVersion: v1 # specifies the API version . Kind : service gets v1 type version 
+kind: Service # specifies the kind of resource we are creating
+metadata:
+  name: app-service # giving name for the service, this provide service for the web application pods
+spec:
+  type: NodePort # to expose the service on each node's IP at a static port (the NodePort)
+  selector:
+    app: web_api # this says only the pods with the label "app: web_api" will recieve traffic from this service
+  ports:
+    - port: 8000 # port on the service
+      targetPort: 8000 # Port on the pod
+      nodePort: 30080 # Port of the Node to expose the service
+      
