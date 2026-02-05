@@ -1,0 +1,99 @@
+{{- if and .Values.enabled.app .Values.app }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.app.deployment.name }}
+  namespace: {{ .Values.namespaces.name }}
+spec:
+  replicas: {{ .Values.app.deployment.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.app.deployment.app }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.app.deployment.app }}
+    spec:
+      containers:
+        - name: {{ .Values.app.deployment.container.name }}
+          image: {{ .Values.app.deployment.container.image }}
+          imagePullPolicy: {{ .Values.app.deployment.container.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.app.deployment.container.port }}
+{{- if .Values.app.deployment.env }}
+          env:
+{{- range .Values.app.deployment.env }}
+            - name: {{ .name }}
+{{- if .value }}
+              value: "{{ .value }}"
+{{- else if .valueFrom }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .valueFrom.secretName }}
+                  key: {{ .valueFrom.secretKey }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if .Values.app.deployment.resources }}
+          resources:
+            requests:
+              cpu: {{ .Values.app.deployment.resources.requests.cpu }}
+              memory: {{ .Values.app.deployment.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.app.deployment.resources.limits.cpu }}
+              memory: {{ .Values.app.deployment.resources.limits.memory }}
+{{- end }}
+{{- end }}
+---
+{{- if and .Values.enabled.database .Values.database }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.database.deployment.name }}
+  namespace: {{ .Values.namespaces.name }}
+spec:
+  replicas: {{ .Values.database.deployment.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.database.deployment.app }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.database.deployment.app }}
+    spec:
+      containers:
+        - name: {{ .Values.database.deployment.container.name }}
+          image: {{ .Values.database.deployment.container.image }}
+          imagePullPolicy: {{ .Values.database.deployment.container.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.database.deployment.container.port }}
+{{- if .Values.database.deployment.env }}
+          env:
+{{- range .Values.database.deployment.env }}
+            - name: {{ .name }}
+{{- if .value }}
+              value: "{{ .value }}"
+{{- else if .valueFrom }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .valueFrom.secretName }}
+                  key: {{ .valueFrom.secretKey }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if .Values.database.deployment.volumeMounts }}
+          volumeMounts:
+{{- range .Values.database.deployment.volumeMounts }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+{{- end }}
+{{- end }}
+{{- if .Values.database.deployment.volumes }}
+      volumes:
+{{- range .Values.database.deployment.volumes }}
+        - name: {{ .name }}
+          persistentVolumeClaim:
+            claimName: {{ .claimName }}
+{{- end }}
+{{- end }}
+{{- end }}

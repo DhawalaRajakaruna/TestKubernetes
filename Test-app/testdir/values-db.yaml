@@ -1,0 +1,79 @@
+# Values file for database-only deployment
+# Use: helm install db-release ./testdir/ -f ./testdir/values-db.yaml -n testspace --create-namespace
+
+# Global settings
+global:
+  namespace: testspace
+
+# Namespace configuration
+namespaces:
+  name: testspace
+  create: true  # Database deployment creates the namespace
+
+# Enable only database components
+enabled:
+  app: false
+  database: true
+  secrets: true
+  pvc: true
+  hpa: false
+
+# Database deployment configuration
+database:
+  deployment:
+    name: postgres-deployment
+    replicas: 1
+    app: postgres
+    
+    container:
+      name: postgres
+      image: postgres:13-alpine
+      imagePullPolicy: IfNotPresent
+      port: 5432
+    
+    env:
+      - name: POSTGRES_USER
+        valueFrom:
+          secretName: db-secret
+          secretKey: POSTGRES_USER
+      
+      - name: POSTGRES_PASSWORD
+        valueFrom:
+          secretName: db-secret
+          secretKey: POSTGRES_PASSWORD
+      
+      - name: POSTGRES_DB
+        valueFrom:
+          secretName: db-secret
+          secretKey: POSTGRES_DB
+    
+    volumeMounts:
+      - name: db-storage
+        mountPath: /var/lib/postgresql/data
+    
+    volumes:
+      - name: db-storage
+        claimName: db-pvc
+  
+  service:
+    name: database-service
+    type: ClusterIP
+    port: 5432
+    protocol: TCP
+    targetPort: 5432
+    selector:
+      app: postgres
+  
+  pvc:
+    name: db-pvc
+    accessModes: ReadWriteOnce
+    reqstorage: 1Gi
+
+# Secrets configuration
+secrets:
+  name: db-secret
+  type: Opaque
+  data:
+    POSTGRES_USER: dhawala
+    POSTGRES_PASSWORD: "123"
+    POSTGRES_DB: Testbase

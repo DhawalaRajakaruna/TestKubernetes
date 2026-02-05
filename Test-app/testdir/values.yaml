@@ -1,0 +1,119 @@
+# Default values for the Helm chart
+# This file contains all possible configuration options
+
+# Global settings
+global:
+  namespace: testspace
+
+# Namespace configuration
+namespaces:
+  name: testspace
+  create: true
+
+# Enable/disable components
+enabled:
+  app: true
+  database: true
+  secrets: true
+  pvc: true
+  hpa: true
+
+# Application deployment configuration
+app:
+  deployment:
+    name: app-deployment
+    replicas: 2
+    app: testkube
+    
+    container:
+      name: testkube
+      image: testkube_app:latest
+      imagePullPolicy: Never
+      port: 8000
+    
+    env:
+      - name: DATABASE_URL
+        value: postgresql://dhawala:123@database-service:5432/Testbase
+    
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "256Mi"
+  
+  service:
+    name: app-service
+    type: NodePort
+    port: 80
+    targetPort: 8000
+    nodePort: 30000
+    selector:
+      app: testkube
+  
+  hpa:
+    name: app-hpa
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+
+# Database deployment configuration
+database:
+  deployment:
+    name: postgres-deployment
+    replicas: 1
+    app: postgres
+    
+    container:
+      name: postgres
+      image: postgres:13-alpine
+      imagePullPolicy: IfNotPresent
+      port: 5432
+    
+    env:
+      - name: POSTGRES_USER
+        valueFrom:
+          secretName: db-secret
+          secretKey: POSTGRES_USER
+      
+      - name: POSTGRES_PASSWORD
+        valueFrom:
+          secretName: db-secret
+          secretKey: POSTGRES_PASSWORD
+      
+      - name: POSTGRES_DB
+        valueFrom:
+          secretName: db-secret
+          secretKey: POSTGRES_DB
+    
+    volumeMounts:
+      - name: db-storage
+        mountPath: /var/lib/postgresql/data
+    
+    volumes:
+      - name: db-storage
+        claimName: db-pvc
+  
+  service:
+    name: database-service
+    type: ClusterIP
+    port: 5432
+    protocol: TCP
+    targetPort: 5432
+    selector:
+      app: postgres
+  
+  pvc:
+    name: db-pvc
+    accessModes: ReadWriteOnce
+    reqstorage: 1Gi
+
+# Secrets configuration
+secrets:
+  name: db-secret
+  type: Opaque
+  data:
+    POSTGRES_USER: dhawala
+    POSTGRES_PASSWORD: "123"
+    POSTGRES_DB: Testbase

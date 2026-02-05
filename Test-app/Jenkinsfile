@@ -1,0 +1,121 @@
+pipeline {
+    agent any
+
+    environment {
+        // Use a Kubernetes config credential bound to KUBECONFIG for kubectl/helm
+        KUBECONFIG = credentials('minikube-config')
+
+
+        NAMESPACE       = 'testspace'
+        HELM_CHART_PATH = './testdir'
+        APP_RELEASE     = 'app-release'
+        DB_RELEASE      = 'db-release'
+        APP_IMAGE_NAME  = 'testkube_app'
+        IMAGE_TAG       = "${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('DockerHub Login + Build & Push Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                    sh '''
+                        set -e
+                        echo "Logging in to DockerHub..."
+                        echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
+
+                        echo "Building image ${DOCKERHUB_USER}/${APP_IMAGE_NAME}:${IMAGE_TAG}..."
+                        docker build -t ${DOCKERHUB_USER}/${APP_IMAGE_NAME}:${IMAGE_TAG} .
+                        docker tag ${DOCKERHUB_USER}/${APP_IMAGE_NAME}:${IMAGE_TAG} ${DOCKERHUB_USER}/${APP_IMAGE_NAME}:latest
+
+                        echo "Pushing image tags..."
+                        docker push ${DOCKERHUB_USER}/${APP_IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${DOCKERHUB_USER}/${APP_IMAGE_NAME}:latest
+
+                        docker logout || true
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy Database (Helm)') {
+            steps {
+                sh '''
+                    set -e
+                    echo "Installing/Upgrading database release ${DB_RELEASE} in namespace ${NAMESPACE}..."
+                    helm upgrade --install ${DB_RELEASE} ${HELM_CHART_PATH} \
+                        -f ${HELM_CHART_PATH}/values-db.yaml \
+                        -n ${NAMESPACE} \
+                        --create-namespace
+
+                    echo "Waiting for PostgreSQL pod to be ready..."
+                    kubectl wait --for=condition=ready pod -l app=postgres -n ${NAMESPACE} --timeout=300s
+                '''
+            }
+        }
+
+        stage('Deploy Application (Helm)') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                    sh '''
+                        set -e
+                        echo "Installing/Upgrading application release ${APP_RELEASE} in namespace ${NAMESPACE}..."
+                        helm upgrade --install ${APP_RELEASE} ${HELM_CHART_PATH} \
+                            -f ${HELM_CHART_PATH}/values-app.yaml \
+                            -n ${NAMESPACE} \
+                            --set app.deployment.container.image=${DOCKERHUB_USER}/${APP_IMAGE_NAME}:${IMAGE_TAG} \
+                            --set app.deployment.container.imagePullPolicy=Always
+
+                        echo "Waiting for application pods to be ready..."
+                        kubectl wait --for=condition=ready pod -l app=testkube -n ${NAMESPACE} --timeout=300s
+                    '''
+                }
+            }
+        }
+
+        stage('Verify & Health Check') {
+            steps {
+                sh '''
+                    set -e
+                    echo "Resources in namespace ${NAMESPACE}:"
+                    kubectl get all -n ${NAMESPACE}
+
+                    echo "Attempting port-forward for health check..."
+                    kubectl port-forward -n ${NAMESPACE} svc/app-service 8080:80 >/dev/null 2>&1 &
+                    PF_PID=$!
+                    sleep 3
+
+                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ || echo "000")
+                    echo "Health check HTTP status: ${STATUS}"
+
+                    kill $PF_PID 2>/dev/null || true
+
+                    if [ "${STATUS}" != "200" ]; then
+                      echo "Warning: health check did not return 200. Check pod logs below:"
+                      kubectl logs -n ${NAMESPACE} -l app=testkube --tail=100 || true
+                    fi
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo ' Deployment pipeline completed successfully.'
+        }
+        failure {
+            echo ' Deployment pipeline failed. Collecting diagnostics...'
+            sh '''
+                set +e
+                kubectl get pods -n ${NAMESPACE} -o wide || true
+                kubectl describe pods -n ${NAMESPACE} || true
+                kubectl get svc -n ${NAMESPACE} || true
+            '''
+        }
+    }
+}
