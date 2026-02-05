@@ -1,0 +1,96 @@
+deployment:
+  db:
+    enabled: false
+  app:
+    enabled: true
+    name: app-deployment
+    replicas: 2
+    container:
+      name: web-api
+      image:
+        repository: web_api_image
+        tag: latest
+      imagePullPolicy: Never
+      containerPort: 8000
+      env:
+        - envname: DATABASE_URL
+          name: app-secret
+          key: DATABASE_URL
+        - envname: ADMIN1_ID
+          name: app-secret
+          key: ADMIN1_ID
+        - envname: ADMIN1_USERNAME
+          name: app-secret
+          key: ADMIN1_USERNAME
+        - envname: ADMIN1_PASSWORD
+          name: app-secret
+          key: ADMIN1_PASSWORD
+        - envname: ADMIN1_NAME
+          name: app-secret
+          key: ADMIN1_NAME
+        - envname: ADMIN1_EMAIL
+          name: app-secret
+          key: ADMIN1_EMAIL
+        - envname: ADMIN2_ID
+          name: app-secret
+          key: ADMIN2_ID
+        - envname: ADMIN2_USERNAME
+          name: app-secret
+          key: ADMIN2_USERNAME
+        - envname: ADMIN2_PASSWORD
+          name: app-secret
+          key: ADMIN2_PASSWORD
+        - envname: ADMIN2_NAME
+          name: app-secret
+          key: ADMIN2_NAME
+        - envname: ADMIN2_EMAIL
+          name: app-secret
+          key: ADMIN2_EMAIL
+      resources:
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+        requests:
+          memory: "256Mi"
+          cpu: "250m"
+
+service:
+  db:
+    enabled: false
+  app:
+    enabled: true
+    name: app-service
+    type: NodePort
+    port: 8000
+    targetPort: 8000
+    nodePort: 30080
+
+pvc:
+  enabled: false
+
+hpa:
+  db:
+    enabled: false
+
+  app:
+    minReplicas: 5
+    maxReplicas: 10
+
+secret:
+  enabled: true
+  name: app-secret
+  type: Opaque
+  POSTGRES_USER: ZGhhd2FsYQ==
+  POSTGRES_PASSWORD: MTIz
+  POSTGRES_DB: bWFuYWdlZGI=
+  DATABASE_URL: cG9zdGdyZXNxbCthc3luY3BnOi8vZGhhd2FsYToxMjNAcG9zdGdyZXMtc2VydmljZTo1NDMyL21hbmFnZWRi
+  ADMIN1_ID: MQ== # 1
+  ADMIN1_USERNAME: RGhhd2FsYQ== # Dhawala
+  ADMIN1_PASSWORD: MTIz # 123
+  ADMIN1_NAME: RGhhd2FsYSBSYWpha2FydW5h # Dhawala Rajakaruna
+  ADMIN1_EMAIL: ZGhhd2FsYUBnbWFpbC5jb20= # dhawala@gmail.com
+  ADMIN2_ID: Mg== # 2
+  ADMIN2_USERNAME: U2Fua2EK # Sanka
+  ADMIN2_PASSWORD: NDU2 # 456
+  ADMIN2_NAME: U2Fua2EgUmFqYWthcnVuYQ== # Sanka Rajakaruna
+  ADMIN2_EMAIL: c2Fua2FAZXhhbXBsZS5jb20= # sanka@example.com

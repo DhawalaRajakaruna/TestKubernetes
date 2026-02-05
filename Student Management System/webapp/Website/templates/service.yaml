@@ -1,0 +1,19 @@
+{{- range $name, $svc := .Values.service }}
+{{- if $svc.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $svc.name }}
+spec:
+  type: {{ $svc.type }}
+  selector:
+    app: {{ include "Website.podName" $name }}
+  ports:
+    - port: {{ $svc.port }}
+      targetPort: {{ $svc.targetPort }}
+{{- if eq $svc.type "NodePort" }}
+      nodePort: {{ $svc.nodePort }}
+{{- end }}
+---
+{{- end }}
+{{- end }}

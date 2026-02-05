@@ -1,0 +1,117 @@
+deployment:
+  app:
+    enabled: true
+    name: app-deployment 
+    replicas: 2
+    container: 
+      image:
+        repository: web_api_image
+        tag: 1.0.1
+      imagePullPolicy: ifNotPresent
+      containerPort: 8000 
+      env:
+        - envname: DATABASE_URL 
+          name: db-secret 
+          key: DATABASE_URL 
+      resource:
+        limits:
+          memory: "512Mi" 
+          cpu: "500m" 
+        requests:
+          memory: "256Mi" 
+          cpu: "250m"
+  
+  db:
+    enabled: true
+    name: postgres-deployment 
+    replicas: 1
+    container: 
+      image:
+        repository: postgres
+        tag: 15-alpine
+      imagePullPolicy: IfNotPresent
+      containerPort: 5432 
+      env:
+        - envname: POSTGRES_USER 
+          name: db-secret 
+          key: POSTGRES_USER
+        - envname: POSTGRES_PASSWORD 
+          name: db-secret 
+          key: POSTGRES_PASSWORD
+        - envname: POSTGRES_DB 
+          name: db-secret 
+          key: POSTGRES_DB
+      volume:
+        - name: postgres-storage 
+          mountPath: /var/lib/postgresql/data
+          volumeClaimName: postgres-pvc
+      resource:
+        limits:
+          memory: "512Mi" 
+          cpu: "500m" 
+        requests:
+          memory: "256Mi" 
+          cpu: "250m"
+
+service:
+  app:
+    enabled: true
+    name: app-service 
+    type: NodePort 
+    port: 8000 
+    targetPort: 8000
+    nodePort: 30080 
+  
+  db:
+    enabled: true
+    name: postgres-service 
+    type: ClusterIP
+    port: 5432 
+    targetPort: 5432
+
+hpa:
+  app:
+    enabled: true
+    name: app-hpa
+    deploymentName: app-deployment # this is repeated 
+    minReplicas: 2
+    maxReplicas: 5
+    metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 70
+
+  db:
+    enabled: true
+    name: db-hpa
+    deploymentName: postgres-deployment # this is repeated
+    minReplicas: 1
+    maxReplicas: 5
+    metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 70
+
+
+pvc:
+  enabled: true
+  name: postgres-pvc
+  storageClassName: standard
+  accessModes: ReadWriteOnce
+  resources:
+      storage: 1Gi
+
+secret:
+  enabled: true
+  name: db-secret
+  type: Opaque
+  POSTGRES_USER: ZGhhd2FsYQ==  # Base64 for 'dhawala'
+  POSTGRES_PASSWORD: MTIz  # Base64 for '123'
+  POSTGRES_DB: bWFuYWdlZGI=  # Base64 for 'managedb'
+  DATABASE_URL: cG9zdGdyZXNxbCthc3luY3BnOi8vZGhhd2FsYToxMjNAcG9zdGdyZXMtc2VydmljZTo1NDMyL21hbmFnZWRi # Base64 for 'postgresql+asyncpg://dhawala:123@postgres-service:5432/managedb'

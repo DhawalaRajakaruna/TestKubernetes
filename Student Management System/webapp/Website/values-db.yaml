@@ -1,0 +1,14 @@
+deployment:
+  app:
+    enabled: false
+
+service:
+  app:
+    enabled: false
+
+pvc:  
+  enabled: true
+
+hpa:
+  app:
+    enabled: false

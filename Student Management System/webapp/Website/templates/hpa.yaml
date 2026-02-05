@@ -1,0 +1,29 @@
+{{- range $name, $dep := .Values.hpa }}  
+{{- if $dep.enabled }}     
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $dep.name }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $dep.deploymentName }} 
+  minReplicas: {{ $dep.minReplicas }}
+  maxReplicas: {{ $dep.maxReplicas }}
+{{- if $dep.metrics }}
+  metrics:
+{{- range $dep.metrics }}
+  - type: {{ .type }}
+{{- if eq .type "Resource" }}
+    resource:
+      name: {{ .resource.name }}
+      target:
+        type: {{ .resource.target.type }}
+        averageUtilization: {{ .resource.target.averageUtilization }}
+{{- end }}
+{{- end }}
+{{- end }}
+---
+{{- end }}
+{{- end }}
